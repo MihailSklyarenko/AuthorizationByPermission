@@ -10,32 +10,32 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers()
-    .AddJsonOptions(o => { o.JsonSerializerOptions.IgnoreNullValues = true; });
+    .AddJsonOptions(opt => 
+    { 
+        opt.JsonSerializerOptions.IgnoreNullValues = true; 
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JwtOptions"));
 
 builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddHttpContextAccessor();
-//builder.Services.ConfigureJwtAuthentication();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseMiddleware<JwtMiddleware>();
-
 app.UseHttpsRedirection();
 
+app.UseMiddleware<JwtMiddleware>();
 //app.UseAuthentication();
 //app.UseAuthorization();
 

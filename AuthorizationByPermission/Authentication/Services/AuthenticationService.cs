@@ -1,5 +1,7 @@
-﻿using AuthorizationByPermission.Interfaces;
+﻿using AuthorizationByPermission.Helpers;
+using AuthorizationByPermission.Interfaces;
 using AuthorizationByPermission.Models.TokenResponse;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -9,13 +11,13 @@ namespace AuthorizationByPermission.Authentication.Services;
 
 public class AuthenticationService : Interfaces.IAuthenticationService
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IUserService _userService;
+    private readonly JwtOptions _JWTOptions;
 
-    public AuthenticationService(IHttpContextAccessor httpContextAccessor, IUserService userService)
+    public AuthenticationService(IUserService userService, IOptions<JwtOptions> JWTOptions)
     {
-        _httpContextAccessor = httpContextAccessor;
         _userService = userService;
+        _JWTOptions = JWTOptions.Value;
     }
 
     public async Task<TokenResponse> SignInAsync(string username, string password, CancellationToken token)
@@ -25,21 +27,24 @@ public class AuthenticationService : Interfaces.IAuthenticationService
         {
             return new TokenResponse() 
             { 
-                Message = "Invalid username or password!",
                 Success = false,
+                Message = "Invalid username or password!",
             };
         }
 
-        var now = DateTime.Now;
-        // создаем JWT-токен
+        var expire = _JWTOptions.ExpireInMinutes;
+        var secret = _JWTOptions.Secret;
+        var issuer = _JWTOptions.Issuer;
+        var dateNow = DateTime.Now;
+
+        var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret));
+
         var jwt = new JwtSecurityToken(
-                issuer: "MyAuthServer",
-                audience: "MyAuthClient",
-                notBefore: now,
+                issuer: issuer,
+                notBefore: dateNow,
                 claims: identity.Claims,
-                expires: now.AddMinutes(1),
-                signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.ASCII.GetBytes("secretkeysecretkeysecretkeysecretkeysecretkey")), 
-                SecurityAlgorithms.HmacSha256));
+                expires: dateNow.AddMinutes(expire),
+                signingCredentials: new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256));
         var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
 
         return new TokenResponse()

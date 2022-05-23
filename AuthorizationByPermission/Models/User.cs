@@ -2,7 +2,7 @@
 
 namespace AuthorizationByPermission.Models
 {
-    public class User : IUserWithPermission
+    public class User : IUserWithPermissions
     {
         public int Id { get; set; }
         public string Name { get; set; }

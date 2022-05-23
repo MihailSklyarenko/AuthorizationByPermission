@@ -16,7 +16,8 @@ public class UserService : IUserService
 
     public Task<User> GetByIdAsync(int id, CancellationToken token)
     {
-        return Task.FromResult(users[id]);
+        var user = users.FirstOrDefault(x => x.Id == id);
+        return Task.FromResult(user);
     }
 
     public Task<User> GetByCredentialsAsync(string login, string password, CancellationToken token)

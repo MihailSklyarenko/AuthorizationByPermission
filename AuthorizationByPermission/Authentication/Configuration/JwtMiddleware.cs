@@ -1,17 +1,19 @@
+using AuthorizationByPermission.Helpers;
 using AuthorizationByPermission.Interfaces;
+using AuthorizationByPermission.Models.Response;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
-namespace AuthorizationByPermission.Helpers;
+namespace AuthorizationByPermission.Authentication.Configuration;
 
 public class JwtMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly JwtSettings _jwtSettings;
+    private readonly JwtOptions _jwtSettings;
 
-    public JwtMiddleware(RequestDelegate next, IOptions<JwtSettings> jwtSettings)
+    public JwtMiddleware(RequestDelegate next, IOptions<JwtOptions> jwtSettings)
     {
         _next = next;
         _jwtSettings = jwtSettings.Value;
@@ -22,12 +24,18 @@ public class JwtMiddleware
         var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
 
         if (token != null)
-            AttachUserToContextAsync(context, userService, token);
+        {
+            var attachResult = await AttachUserToContextAsync(context, userService, token);
+            if (attachResult == false)
+            {
+                return;
+            }
+        }
 
         await _next(context);
     }
 
-    private async Task AttachUserToContextAsync(HttpContext context, IUserService userService, string token)
+    private async Task<bool> AttachUserToContextAsync(HttpContext context, IUserService userService, string token)
     {
         try
         {
@@ -45,12 +53,29 @@ public class JwtMiddleware
 
             var jwtToken = (JwtSecurityToken)validatedToken;
             var userId = int.Parse(jwtToken.Claims.First(x => x.Type == "id").Value);
-
-            // attach user to context on successful jwt validation
             context.Items["User"] = await userService.GetByIdAsync(userId, context.RequestAborted);
+            return true;
+        }
+        catch (SecurityTokenExpiredException)
+        {
+            context.Response.StatusCode = 401;
+            await context.Response.WriteAsJsonAsync(new ResponseBase
+            {
+                Success = false,
+                Message = "Token expired."
+            });
+
+            return false;
         }
         catch
-        {            
+        {
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsJsonAsync(new ResponseBase
+            {
+                Success = false,
+                Message = "Server exception on work with token."
+            });
+            return false;
         }
     }
 }
